@@ -59,6 +59,39 @@ public class DocumentTest extends LiteTestCase {
         assertNull(database.getExistingDocument("missing"));
     }
 
+    public void testPutDeletedDocument() throws CouchbaseLiteException {
+
+        Document document = database.createDocument();
+        Map<String, Object> properties = new HashMap<String, Object>();
+        properties.put("foo", "foo");
+        properties.put("bar", Boolean.FALSE);
+        document.putProperties(properties);
+        Assert.assertNotNull(document.getCurrentRevision());
+        String docId = document.getId();
+
+        properties.put("_rev",document.getCurrentRevisionId());
+        properties.put("_deleted", true);
+        SavedRevision newRev = document.putProperties(properties);
+
+        newRev.loadProperties();
+        assertTrue( newRev.getProperties().containsKey("foo") );
+        assertTrue( newRev.getProperties().containsKey("bar") );
+
+        Assert.assertTrue(document.isDeleted());
+        Document fetchedDoc = database.getExistingDocument(docId);
+        Assert.assertNull(fetchedDoc);
+
+        // query all docs and make sure we don't see that document
+        database.getAllDocs(new QueryOptions());
+        Query queryAllDocs = database.createAllDocumentsQuery();
+        QueryEnumerator queryEnumerator = queryAllDocs.run();
+        for (Iterator<QueryRow> it = queryEnumerator; it.hasNext();) {
+            QueryRow row = it.next();
+            Assert.assertFalse(row.getDocument().getId().equals(docId));
+        }
+
+    }
+
     // Reproduces issue #167
     // https://github.com/couchbase/couchbase-lite-android/issues/167
     public void testLoadRevisionBody() throws CouchbaseLiteException {
